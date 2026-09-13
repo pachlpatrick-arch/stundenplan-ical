@@ -1,0 +1,42 @@
+name: WebUntis iCal Sync
+
+on:
+  schedule:
+    # 1. Alle 6 Stunden (00:00, 06:00, 12:00, 18:00 UTC)
+    - cron: '0 */6 * * *'
+    # 2. Jeden Sonntag um 19:00 Uhr Wiener Zeit (entspricht 18:00 UTC im Winter, 17:00 UTC im Sommer)
+    # Da GitHub Actions in UTC läuft, triggern wir zur Sicherheit um 17:00 und 18:00 UTC
+    - cron: '0 17,18 * * 0'
+    # 3. Jeden Montag um 07:00 Uhr Wiener Zeit (entspricht 05:00 bzw. 06:00 UTC)
+    - cron: '0 5,6 * * 1'
+  workflow_dispatch: # Erlaubt es dir, das Skript jederzeit manuell zu starten
+
+jobs:
+  update-calendar:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Erlaubt das automatische Speichern der Datei im Repo
+
+    steps:
+    - name: Code auschecken
+      uses: actions/checkout@v4
+
+    - name: Python einrichten
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Abhängigkeiten installieren
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests
+
+    - name: Skript ausführen
+      run: python script.py
+
+    - name: Änderungen committen und pushen
+      run: |
+        git config --global user.name "GitHub Action Bot"
+        git config --global user.email "actions@github.com"
+        git add stundenplan.ics
+        git diff --quiet && git diff --staged --quiet || (git commit -m "Stundenplan automatisch aktualisiert" && git push)
