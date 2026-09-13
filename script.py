@@ -19,14 +19,14 @@ def fetch_timetable():
     start_date = datetime.strptime(START_DATE_STR, "%Y-%m-%d")
     
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Content-Type": "application/json",
         "X-Requested-With": "XMLHttpRequest"
     }
 
     session = requests.Session()
 
-    # 1. Schritt: Login
+    # 1. Schritt: Login bei WebUntis
     login_url = f"https://webuntis.com"
     login_data = {"username": USERNAME, "password": PASSWORD, "school": SCHOOL_NAME}
     
@@ -38,7 +38,7 @@ def fetch_timetable():
             return
             
         login_json = login_res.json()
-        # Wir holen uns die echte Schüler-ID direkt aus der erfolgreichen Anmeldung!
+        # Holt deine persönliche ID direkt aus der erfolgreichen Anmeldung
         person_id = login_json.get("data", {}).get("personId")
         if not person_id:
             print("Login war erfolgreich, aber keine Schüler-ID (personId) gefunden.")
@@ -49,11 +49,11 @@ def fetch_timetable():
         print(f"Login-Fehler: {e}")
         return
 
-    # 2. Schritt: Daten abrufen (wir nutzen elementType=5 für Schüler)
+    # 2. Schritt: Daten für die nächsten 4 Wochen abrufen
     for week_offset in range(0, 4):
         target_date = (start_date + timedelta(weeks=week_offset)).strftime("%Y-%m-%d")
         
-        # Interne API-Route für eingeloggte Schüler
+        # Interne API-Route für eingeloggte Schüler (elementType=5)
         api_url = f"https://webuntis.com{person_id}&date={target_date}&formatId=3"
         
         try:
@@ -71,12 +71,12 @@ def fetch_timetable():
                 print(f"Keine Termine für die Woche ab {target_date} gefunden.")
                 continue
                 
-            print(f"-> Erfolg! {len(periods)} Termine in dieser Woche gefunden.")
+            print(f"-> {len(periods)} Unterrichtsstunden erfasst.")
             elements = {el["id"]: el for el in result.get("elements", [])}
             
             for p in periods:
                 if p.get("is", {}).get("cancelled", False):
-                    continue
+                    continue  # Ausgefallene Stunden ignorieren
                 
                 p_date = str(p["date"])
                 sh, sm = str(p["startTime"]).zfill(4)[:2], str(p["startTime"]).zfill(4)[2:]
@@ -90,8 +90,10 @@ def fetch_timetable():
                     el_type = el_ref["type"]
                     if el_id in elements:
                         name = elements[el_id].get("longName", elements[el_id].get("name", ""))
-                        if el_type == 3: subject = name
-                        elif el_type == 4: room = name
+                        if el_type == 3: 
+                            subject = name
+                        elif el_type == 4: 
+                            room = name
                 
                 uid = f"uid-{p['id']}-{p_date}@webuntis"
                 summary = subject if subject else "Unterricht"
@@ -110,7 +112,7 @@ def fetch_timetable():
         except Exception as e:
             print(f"Fehler bei der Abfrage für Woche {target_date}: {e}")
 
-    # 3. Schritt: Speichern
+    # 3. Schritt: iCal zusammenbauen und speichern
     ical_content = [
         "BEGIN:VCALENDAR",
         "VERSION:2.0",
