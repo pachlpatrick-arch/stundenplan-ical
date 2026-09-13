@@ -1,7 +1,7 @@
 BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:-//WebUntis Extractor//DE
-X-WR-CALNAME:Stundenplan
+X-WR-CALNAME:Stundenplan ELGYM
 X-WR-TIMEZONE:Europe/Vienna
 
 END:VCALENDAR
