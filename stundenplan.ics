@@ -3,5 +3,6 @@ VERSION:2.0
 PRODID:-//WebUntis Extractor//DE
 X-WR-CALNAME:Stundenplan ELGYM
 X-WR-TIMEZONE:Europe/Vienna
+X-WR-CALDESC:Starte Skript um 2026-09-13T18\:35\:31.584427\nFEHLER\: UNTIS_USER oder UNTIS_PASSWORD fehlt in den Secrets!
 
 END:VCALENDAR
