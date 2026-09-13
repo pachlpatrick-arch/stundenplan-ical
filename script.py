@@ -1,4 +1,3 @@
-import os
 import requests
 from datetime import datetime, timedelta
 
@@ -6,15 +5,11 @@ from datetime import datetime, timedelta
 SCHOOL_NAME = "elgym"
 START_DATE_STR = "2026-09-14"
 
-# Sichere Zugangsdaten aus den GitHub Secrets laden
-USERNAME = os.environ.get("UNTIS_USER")
-PASSWORD = os.environ.get("UNTIS_PASSWORD")
+# Deine Zugangsdaten direkt im Code hinterlegt
+USERNAME = "EL240122"
+PASSWORD = "3075@Z2h"
 
 def fetch_timetable():
-    if not USERNAME or not PASSWORD:
-        print("Fehler: UNTIS_USER oder UNTIS_PASSWORD fehlt in den Secrets!")
-        return
-
     ical_events = []
     start_date = datetime.strptime(START_DATE_STR, "%Y-%m-%d")
     
@@ -48,7 +43,7 @@ def fetch_timetable():
         print(f"Login-Fehler: {e}")
         return
 
-    # 2. Schritt: Daten abrufen (wir nutzen elementType=5 für Schüler)
+    # 2. Schritt: Daten abrufen (elementType=5 für Schüler)
     for week_offset in range(0, 4):
         target_date = (start_date + timedelta(weeks=week_offset)).strftime("%Y-%m-%d")
         api_url = f"https://webuntis.com{person_id}&date={target_date}&formatId=3"
@@ -118,7 +113,7 @@ def fetch_timetable():
     
     with open("stundenplan.ics", "w", encoding="utf-8") as f:
         f.write("\n".join(ical_content))
-    print(f"Erfolgreich beendet! {len(ical_events)} Unterrichtsstunden wurden in die Datei geschrieben.")
+    print(f"Erfolgreich beendet! {len(ical_events)} Unterrichtsstunden wurden exportiert.")
 
 if __name__ == "__main__":
     fetch_timetable()
