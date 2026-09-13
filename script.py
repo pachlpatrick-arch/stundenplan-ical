@@ -4,7 +4,6 @@ from datetime import datetime, timedelta
 
 # Konfiguration
 SCHOOL_NAME = "elgym"
-ENTITY_ID = 15159
 START_DATE_STR = "2026-09-14"
 
 # Daten aus den GitHub Secrets laden
@@ -37,78 +36,79 @@ def fetch_timetable():
         if login_res.status_code != 200:
             print(f"Login fehlgeschlagen ({login_res.status_code})")
             return
-        print("Login erfolgreich!")
+            
+        login_json = login_res.json()
+        # Wir holen uns die echte Schüler-ID direkt aus der erfolgreichen Anmeldung!
+        person_id = login_json.get("data", {}).get("personId")
+        if not person_id:
+            print("Login war erfolgreich, aber keine Schüler-ID (personId) gefunden.")
+            return
+            
+        print(f"Login erfolgreich! Deine Schüler-ID ist: {person_id}")
     except Exception as e:
         print(f"Login-Fehler: {e}")
         return
 
-    # 2. Schritt: Wir testen elementType=1 (Klasse) und elementType=5 (Schüler)
-    # Da WebUntis-Links manchmal uneindeutig sind, probieren wir beide durch!
-    for element_type in [1, 5]:
-        print(f"Versuche Daten abzurufen für elementType={element_type}...")
-        temporary_events = []
+    # 2. Schritt: Daten abrufen (wir nutzen elementType=5 für Schüler)
+    for week_offset in range(0, 4):
+        target_date = (start_date + timedelta(weeks=week_offset)).strftime("%Y-%m-%d")
         
-        for week_offset in range(0, 4):
-            target_date = (start_date + timedelta(weeks=week_offset)).strftime("%Y-%m-%d")
-            
-            # Wir testen sowohl die interne als auch die öffentliche API-Route mit aktiver Session
-            for api_route in ["timetable/weekly/data", "public/timetable/weekly/data"]:
-                api_url = f"https://webuntis.com{api_route}?elementType={element_type}&elementId={ENTITY_ID}&date={target_date}&formatId=3&schoolName={SCHOOL_NAME}"
+        # Interne API-Route für eingeloggte Schüler
+        api_url = f"https://webuntis.com{person_id}&date={target_date}&formatId=3"
+        
+        try:
+            print(f"Lade Stundenplan für Woche ab {target_date}...")
+            response = session.get(api_url, headers=headers, timeout=12)
+            if response.status_code != 200:
+                print(f"Fehler bei Woche {target_date}: Status {response.status_code}")
+                continue
                 
-                try:
-                    response = session.get(api_url, headers=headers, timeout=12)
-                    if response.status_code != 200:
-                        continue
-                        
-                    data = response.json()
-                    result = data.get("data", {}).get("result", {})
-                    periods = result.get("periods", [])
-                    
-                    if periods:
-                        print(f"-> Erfolg! {len(periods)} Termine gefunden für Typ {element_type} via {api_route} (Woche {target_date})")
-                        elements = {el["id"]: el for el in result.get("elements", [])}
-                        
-                        for p in periods:
-                            if p.get("is", {}).get("cancelled", False):
-                                continue
-                            
-                            p_date = str(p["date"])
-                            sh, sm = str(p["startTime"]).zfill(4)[:2], str(p["startTime"]).zfill(4)[2:]
-                            eh, em = str(p["endTime"]).zfill(4)[:2], str(p["endTime"]).zfill(4)[2:]
-                            
-                            subject = ""
-                            room = ""
-                            
-                            for el_ref in p.get("elements", []):
-                                el_id = el_ref["id"]
-                                el_type = el_ref["type"]
-                                if el_id in elements:
-                                    name = elements[el_id].get("longName", elements[el_id].get("name", ""))
-                                    if el_type == 3: subject = name
-                                    elif el_type == 4: room = name
-                            
-                            uid = f"uid-{p['id']}-{p_date}@webuntis"
-                            summary = subject if subject else "Unterricht"
-                            
-                            event = [
-                                "BEGIN:VEVENT",
-                                f"UID:{uid}",
-                                f"DTSTART;TZID=Europe/Vienna:{p_date}T{sh}{sm}00",
-                                f"DTEND;TZID=Europe/Vienna:{p_date}T{eh}{em}00",
-                                f"SUMMARY:{summary}",
-                                f"LOCATION:{room}",
-                                "END:VEVENT"
-                            ]
-                            temporary_events.append("\n".join(event))
-                        break # Wenn diese Route für die Woche klappte, nächste Woche ansehen
-                        
-                except Exception as e:
-                    print(f"Fehler bei Typ {element_type}: {e}")
-                    
-        if temporary_events:
-            ical_events.extend(temporary_events)
-            print(f"Gesamt {len(temporary_events)} Termine für elementType={element_type} gesichert.")
-            break # Wenn wir erfolgreich Termine extrahiert haben, brechen wir die Suche ab
+            data = response.json()
+            result = data.get("data", {}).get("result", {})
+            periods = result.get("periods", [])
+            
+            if not periods:
+                print(f"Keine Termine für die Woche ab {target_date} gefunden.")
+                continue
+                
+            print(f"-> Erfolg! {len(periods)} Termine in dieser Woche gefunden.")
+            elements = {el["id"]: el for el in result.get("elements", [])}
+            
+            for p in periods:
+                if p.get("is", {}).get("cancelled", False):
+                    continue
+                
+                p_date = str(p["date"])
+                sh, sm = str(p["startTime"]).zfill(4)[:2], str(p["startTime"]).zfill(4)[2:]
+                eh, em = str(p["endTime"]).zfill(4)[:2], str(p["endTime"]).zfill(4)[2:]
+                
+                subject = ""
+                room = ""
+                
+                for el_ref in p.get("elements", []):
+                    el_id = el_ref["id"]
+                    el_type = el_ref["type"]
+                    if el_id in elements:
+                        name = elements[el_id].get("longName", elements[el_id].get("name", ""))
+                        if el_type == 3: subject = name
+                        elif el_type == 4: room = name
+                
+                uid = f"uid-{p['id']}-{p_date}@webuntis"
+                summary = subject if subject else "Unterricht"
+                
+                event = [
+                    "BEGIN:VEVENT",
+                    f"UID:{uid}",
+                    f"DTSTART;TZID=Europe/Vienna:{p_date}T{sh}{sm}00",
+                    f"DTEND;TZID=Europe/Vienna:{p_date}T{eh}{em}00",
+                    f"SUMMARY:{summary}",
+                    f"LOCATION:{room}",
+                    "END:VEVENT"
+                ]
+                ical_events.append("\n".join(event))
+                
+        except Exception as e:
+            print(f"Fehler bei der Abfrage für Woche {target_date}: {e}")
 
     # 3. Schritt: Speichern
     ical_content = [
