@@ -27,7 +27,11 @@ jobs:
         python -m pip install --upgrade pip
         pip install requests
 
-    - name: Skript ausführen
+    - name: Skript mit Passwörtern ausführen
+      env:
+        # Diese beiden Zeilen reichen deine Passwörter jetzt sicher an das Skript weiter!
+        UNTIS_USER: ${{ secrets.UNTIS_USER }}
+        UNTIS_PASSWORD: ${{ secrets.UNTIS_PASSWORD }}
       run: python script.py
 
     - name: Datei auf GitHub abspeichern und veröffentlichen
